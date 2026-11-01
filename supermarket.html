@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventario y Compras - Casa</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen pb-12">
+
+    <!-- Header -->
+    <header class="bg-indigo-600 text-white shadow-md sticky top-0 z-40">
+        <div class="max-w-6xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <h1 class="text-2xl font-bold flex items-center gap-2">
+                <i class="fa-solid fa-house-chimney-user"></i> Control de Alimentos, Casa y Bebé
+            </h1>
+            <div class="flex gap-2">
+                <button onclick="switchTab('inventory')" id="btn-inventory" class="px-4 py-2 bg-indigo-700 rounded-lg font-medium transition flex items-center gap-2 shadow-inner text-sm">
+                    <i class="fa-solid fa-boxes-stacked"></i> Inventario Casa
+                </button>
+                <button onclick="switchTab('shopping')" id="btn-shopping" class="px-4 py-2 bg-indigo-800/50 hover:bg-indigo-700 rounded-lg font-medium transition flex items-center gap-2 text-sm">
+                    <i class="fa-solid alt fa-cart-shopping"></i> Supermercado <span id="shopping-badge" class="bg-amber-500 text-xs px-2 py-0.5 rounded-full text-white">0</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-4 py-6 space-y-4">
+
+        <!-- SECCIÓN INVENTARIO -->
+        <section id="section-inventory" class="space-y-4">
+            
+            <!-- ACORDEÓN DE ALERTAS DE STOCK MÍNIMO -->
+            <details id="alerts-accordion" class="bg-amber-50 rounded-xl shadow-sm border border-amber-200 overflow-hidden hidden">
+                <summary class="bg-amber-100 hover:bg-amber-200 p-4 font-bold text-amber-900 cursor-pointer flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 select-none transition">
+                    <span class="flex items-center gap-2">
+                        <i class="fa-solid fa-triangle-exclamation text-amber-600"></i> Alertas de Stock Mínimo 
+                        <span id="alerts-count-badge" class="bg-rose-500 text-white text-xs px-2 py-0.5 rounded-full">0</span>
+                    </span>
+                    <div class="flex items-center gap-3">
+                        <button onclick="event.stopPropagation(); sendAllAlertsToShopping()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition shadow flex items-center gap-1">
+                            <i class="fa-solid fa-cart-plus"></i> Enviar todos al súper
+                        </button>
+                        <span class="text-xs text-amber-700 font-normal">Clic para desplegar</span>
+                    </div>
+                </summary>
+                <div class="p-4 flex flex-wrap gap-2" id="alerts-container"></div>
+            </details>
+
+            <!-- Barra de Buscador -->
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                <input type="text" id="search-inventory" placeholder="Buscar producto o marca..." oninput="renderInventory()" class="px-3 py-2 border rounded-lg text-sm w-full sm:w-80 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <button onclick="openModal('create')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 shadow w-full sm:w-auto justify-center">
+                    <i class="fa-solid fa-plus"></i> Nuevo Elemento
+                </button>
+            </div>
+
+            <!-- ACORDEÓN 1: INVENTARIO CERRADO (Alimentos) -->
+            <details class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden group">
+                <summary class="bg-slate-100 hover:bg-slate-200 p-4 font-bold text-slate-700 cursor-pointer flex justify-between items-center select-none transition">
+                    <span class="flex items-center gap-2"><i class="fa-solid fa-box text-emerald-600"></i> Inventario Cerrado (Alimentos Alacena/Nevera)</span>
+                    <span id="count-closed" class="bg-emerald-100 text-emerald-800 text-xs px-2.5 py-1 rounded-full">0 items</span>
+                </summary>
+                <div class="p-3 space-y-3 bg-slate-50/50">
+                    <details class="bg-white rounded-lg border border-rose-200 overflow-hidden">
+                        <summary class="bg-rose-50 hover:bg-rose-100 p-3 font-bold text-rose-900 cursor-pointer flex justify-between items-center text-sm select-none transition">
+                            <span class="flex items-center gap-2"><i class="fa-solid fa-triangle-exclamation text-rose-600"></i> ⚠️ Bajo Stock (Requieren reposición)</span>
+                            <span id="subcount-closed-low" class="bg-rose-200 text-rose-900 text-xs px-2 py-0.5 rounded-full">0</span>
+                        </summary>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse text-sm">
+                                <thead class="bg-slate-50 text-slate-500 uppercase text-xs border-b border-slate-200">
+                                    <tr><th class="p-2.5">Producto</th><th class="p-2.5">Marca</th><th class="p-2.5">Presentación</th><th class="p-2.5 text-center">Cantidad</th><th class="p-2.5 text-center">Mínimo</th><th class="p-2.5 text-right">Acciones</th></tr>
+                                </thead>
+                                <tbody id="table-closed-low" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </details>
+                    <details class="bg-white rounded-lg border border-emerald-200 overflow-hidden">
+                        <summary class="bg-emerald-50 hover:bg-emerald-100 p-3 font-bold text-emerald-900 cursor-pointer flex justify-between items-center text-sm select-none transition">
+                            <span class="flex items-center gap-2"><i class="fa-solid fa-circle-check text-emerald-600"></i> ✅ Stock Normal (Óptimo)</span>
+                            <span id="subcount-closed-normal" class="bg-emerald-200 text-emerald-900 text-xs px-2 py-0.5 rounded-full">0</span>
+                        </summary>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse text-sm">
+                                <thead class="bg-slate-50 text-slate-500 uppercase text-xs border-b border-slate-200">
+                                    <tr><th class="p-2.5">Producto</th><th class="p-2.5">Marca</th><th class="p-2.5">Presentación</th><th class="p-2.5 text-center">Cantidad</th><th class="p-2.5 text-center">Mínimo</th><th class="p-2.5 text-right">Acciones</th></tr>
+                                </thead>
+                                <tbody id="table-closed-normal" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </details>
+                </div>
+            </details>
+
+            <!-- ACORDEÓN 2: INVENTARIO ABIERTO (Alimentos) -->
+            <details class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden group">
+                <summary class="bg-slate-100 hover:bg-slate-200 p-4 font-bold text-slate-700 cursor-pointer flex justify-between items-center select-none transition">
+                    <span class="flex items-center gap-2"><i class="fa-solid fa-box-open text-amber-600"></i> Inventario Abierto (Alimentos en uso)</span>
+                    <span id="count-open" class="bg-amber-100 text-amber-800 text-xs px-2.5 py-1 rounded-full">0 items</span>
+                </summary>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead class="bg-slate-50 text-slate-500 uppercase text-xs border-b border-slate-200">
+                            <tr><th class="p-3">Producto</th><th class="p-3">Marca</th><th class="p-3">Presentación</th><th class="p-3 text-center">Cantidad</th><th class="p-3 text-right">Acciones</th></tr>
+                        </thead>
+                        <tbody id="table-open" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </details>
+
+            <!-- ACORDEÓN 3: COSAS DE LA CASA -->
+            <details class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden group">
+                <summary class="bg-slate-100 hover:bg-slate-200 p-4 font-bold text-slate-700 cursor-pointer flex justify-between items-center select-none transition">
+                    <span class="flex items-center gap-2"><i class="fa-solid fa-spray-can-sparkles text-blue-600"></i> Cosas de la Casa (Limpieza y Hogar)</span>
+                    <span id="count-house" class="bg-blue-100 text-blue-800 text-xs px-2.5 py-1 rounded-full">0 items</span>
+                </summary>
+                <div class="p-3 space-y-3 bg-slate-50/50">
+                    <details class="bg-white rounded-lg border border-rose-200 overflow-hidden">
+                        <summary class="bg-rose-50 hover:bg-rose-100 p-3 font-bold text-rose-900 cursor-pointer flex justify-between items-center text-sm select-none transition">
+                            <span class="flex items-center gap-2"><i class="fa-solid fa-triangle-exclamation text-rose-600"></i> ⚠️ Bajo Stock (Casa)</span>
+                            <span id="subcount-house-low" class="bg-rose-200 text-rose-900 text-xs px-2 py-0.5 rounded-full">0</span>
+                        </summary>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse text-sm">
+                                <thead class="bg-slate-50 text-slate-500 uppercase text-xs border-b border-slate-200">
+                                    <tr><th class="p-2.5">Producto</th><th class="p-2.5">Marca</th><th class="p-2.5">Presentación</th><th class="p-2.5 text-center">Cantidad</th><th class="p-2.5 text-center">Mínimo</th><th class="p-2.5 text-right">Acciones</th></tr>
+                                </thead>
+                                <tbody id="table-house-low" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </details>
+                    <details class="bg-white rounded-lg border border-emerald-200 overflow-hidden">
+                        <summary class="bg-emerald-50 hover:bg-emerald-100 p-3 font-bold text-emerald-900 cursor-pointer flex justify-between items-center text-sm select-none transition">
+                            <span class="flex items-center gap-2"><i class="fa-solid fa-circle-check text-emerald-600"></i> ✅ Stock Normal (Casa)</span>
+                            <span id="subcount-house-normal" class="bg-emerald-200 text-emerald-900 text-xs px-2 py-0.5 rounded-full">0</span>
+                        </summary>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse text-sm">
+                                <thead class="bg-slate-50 text-slate-500 uppercase text-xs border-b border-slate-200">
+                                    <tr><th class="p-2.5">Producto</th><th class="p-2.5">Marca</th><th class="p-2.5">Presentación</th><th class="p-2.5 text-center">Cantidad</th><th class="p-2.5 text-center">Mínimo</th><th class="p-2.5 text-right">Acciones</th></tr>
+                                </thead>
+                                <tbody id="table-house-normal" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </details>
+                </div>
+            </details>
+
+            <!-- ACORDEÓN 4: COSAS DEL BEBÉ -->
+            <details class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden group">
+                <summary class="bg-slate-100 hover:bg-slate-200 p-4 font-bold text-slate-700 cursor-pointer flex justify-between items-center select-none transition">
+                    <span class="flex items-center gap-2"><i class="fa-solid fa-baby text-purple-600"></i> Cosas del Bebé (Eithan)</span>
+                    <span id="count-baby" class="bg-purple-100 text-purple-800 text-xs px-2.5 py-1 rounded-full">0 items</span>
+                </summary>
+                <div class="p-3 space-y-3 bg-slate-50/50">
+                    <details class="bg-white rounded-lg border border-rose-200 overflow-hidden">
+                        <summary class="bg-rose-50 hover:bg-rose-100 p-3 font-bold text-rose-900 cursor-pointer flex justify-between items-center text-sm select-none transition">
+                            <span class="flex items-center gap-2"><i class="fa-solid fa-triangle-exclamation text-rose-600"></i> ⚠️ Bajo Stock (Bebé)</span>
+                            <span id="subcount-baby-low" class="bg-rose-200 text-rose-900 text-xs px-2 py-0.5 rounded-full">0</span>
+                        </summary>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse text-sm">
+                                <thead class="bg-slate-50 text-slate-500 uppercase text-xs border-b border-slate-200">
+                                    <tr><th class="p-2.5">Producto</th><th class="p-2.5">Marca</th><th class="p-2.5">Presentación</th><th class="p-2.5 text-center">Cantidad</th><th class="p-2.5 text-center">Mínimo</th><th class="p-2.5 text-right">Acciones</th></tr>
+                                </thead>
+                                <tbody id="table-baby-low" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </details>
+                    <details class="bg-white rounded-lg border border-emerald-200 overflow-hidden">
+                        <summary class="bg-emerald-50 hover:bg-emerald-100 p-3 font-bold text-emerald-900 cursor-pointer flex justify-between items-center text-sm select-none transition">
+                            <span class="flex items-center gap-2"><i class="fa-solid fa-circle-check text-emerald-600"></i> ✅ Stock Normal (Bebé)</span>
+                            <span id="subcount-baby-normal" class="bg-emerald-200 text-emerald-900 text-xs px-2 py-0.5 rounded-full">0</span>
+                        </summary>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse text-sm">
+                                <thead class="bg-slate-50 text-slate-500 uppercase text-xs border-b border-slate-200">
+                                    <tr><th class="p-2.5">Producto</th><th class="p-2.5">Marca</th><th class="p-2.5">Presentación</th><th class="p-2.5 text-center">Cantidad</th><th class="p-2.5 text-center">Mínimo</th><th class="p-2.5 text-right">Acciones</th></tr>
+                                </thead>
+                                <tbody id="table-baby-normal" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </details>
+                </div>
+            </details>
+
+        </section>
+
+        <!-- SECCIÓN SUPERMERCADO (PESTAÑA 2) -->
+        <section id="section-shopping" class="hidden space-y-4">
+            
+            <!-- Panel Total Superior / Flotante -->
+            <div class="bg-indigo-900 text-white p-4 rounded-xl shadow-md flex justify-between items-center sticky top-20 z-30">
+                <div>
+                    <p class="text-xs text-indigo-200 uppercase font-semibold">Total Estimado Divisas ($)</p>
+                    <p id="shopping-total-price" class="text-2xl font-black">$0.00</p>
+                </div>
+                <button onclick="updateInventoryFromShopping()" class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2.5 rounded-lg text-xs font-bold transition shadow flex items-center gap-1.5 uppercase tracking-wide">
+                    <i class="fa-solid fa-check-double text-base"></i> Actualizar Inventario
+                </button>
+            </div>
+
+            <!-- Lista de Compras con Botón de Borrar y Presentación Visible -->
+            <div id="shopping-list-container" class="space-y-2">
+                <!-- Dinámico -->
+            </div>
+
+            <div class="pt-2 flex justify-between items-center">
+                <button onclick="clearCompletedShopping()" class="text-xs text-slate-500 hover:text-slate-700 underline py-2">Limpiar chequeados</button>
+                <button onclick="openCustomShoppingModal()" class="text-xs bg-indigo-50 text-indigo-600 font-bold px-3 py-2 rounded-lg border border-indigo-200">+ Agregar otro producto</button>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- MODAL GENERAL PARA INVENTARIO -->
+    <div id="modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl max-w-md w-full p-6 shadow-xl space-y-4">
+            <h3 id="modal-title" class="text-lg font-bold text-slate-800">Agregar Elemento</h3>
+            <form id="modal-form" onsubmit="handleFormSubmit(event)" class="space-y-4">
+                <input type="hidden" id="form-id">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Nombre del Producto</label>
+                    <input type="text" id="form-name" placeholder="Ej: Harina PAN, Cloro..." required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Sección / Categoría</label>
+                        <select id="form-category" class="w-full px-3 py-2 border rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            <option value="Cerrado">Alimento (Cerrado)</option>
+                            <option value="Abierto">Alimento (Abierto)</option>
+                            <option value="Casa">Cosas de la Casa</option>
+                            <option value="Bebé">Cosas del Bebé (Eithan)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Cantidad Actual</label>
+                        <input type="number" id="form-qty" placeholder="Ej: 1" min="0" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Presentación / Medida</label>
+                        <select id="form-weight" class="w-full px-3 py-2 border rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            <option value="1 kg">1 kg</option>
+                            <option value="500 gr">500 gr</option>
+                            <option value="1 Litro">1 Litro</option>
+                            <option value="500 ml">500 ml</option>
+                            <option value="Paquete">Paquete</option>
+                            <option value="Pote">Pote</option>
+                            <option value="Lata">Lata</option>
+                            <option value="Barra">Barra</option>
+                            <option value="Cartón 30 un">Cartón 30 un</option>
+                            <option value="Unidad">Unidad</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Marca</label>
+                        <input type="text" id="form-brand" placeholder="Ej: PAN, Las Llaves" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Stock Mínimo (Alerta)</label>
+                    <input type="number" id="form-min" placeholder="Ej: 2" min="0" value="2" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 border rounded-lg text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg shadow">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL RÁPIDO PARA AGREGAR AL SUPER DESDE LA CALLE -->
+    <div id="modal-shopping" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl max-w-sm w-full p-5 shadow-xl space-y-3">
+            <h3 class="text-base font-bold text-slate-800">Agregar al Supermercado</h3>
+            <form onsubmit="handleCustomShoppingSubmit(event)" class="space-y-3 text-sm">
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-500 uppercase">Producto y Marca</label>
+                    <input type="text" id="shop-custom-name" placeholder="Ej: Galletas OREO..." required class="w-full px-3 py-2 border rounded-lg">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-500 uppercase">Cantidad</label>
+                        <input type="number" id="shop-custom-qty" min="1" value="1" required class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-500 uppercase">Presentación</label>
+                        <select id="shop-custom-weight" class="w-full px-2 py-2 border rounded-lg bg-white">
+                            <option value="1 kg">1 kg</option>
+                            <option value="500 gr">500 gr</option>
+                            <option value="1 Litro">1 Litro</option>
+                            <option value="500 ml">500 ml</option>
+                            <option value="Paquete">Paquete</option>
+                            <option value="Pote">Pote</option>
+                            <option value="Lata">Lata</option>
+                            <option value="Barra">Barra</option>
+                            <option value="Unidad">Unidad</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-500 uppercase">Precio ($ Divisas)</label>
+                    <input type="number" step="0.01" id="shop-custom-price" min="0" placeholder="0.00" class="w-full px-3 py-2 border rounded-lg">
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeCustomShoppingModal()" class="px-3 py-1.5 border rounded-lg text-xs text-slate-600">Cancelar</button>
+                    <button type="submit" class="px-4 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg">Añadir</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Script de Lógica -->
+    <script>
+        const defaultInventory = [
+            { id: 1, name: 'Harina de maíz', qty: 4, min: 4, weight: '1 kg', brand: 'PAN', section: 'Cerrado' },
+            { id: 2, name: 'Arroz', qty: 6, min: 6, weight: '1 kg', brand: 'Mónica', section: 'Cerrado' },
+            { id: 3, name: 'Pasta corta', qty: 4, min: 4, weight: '500 gr', brand: 'Diana', section: 'Cerrado' },
+            { id: 4, name: 'Pasta larga', qty: 1, min: 2, weight: '1 kg', brand: 'Horizonte', section: 'Cerrado' },
+            { id: 5, name: 'Harina de trigo', qty: 1, min: 2, weight: '1 kg', brand: 'Del Campo', section: 'Cerrado' },
+            { id: 6, name: 'Sal', qty: 1, min: 1, weight: '500 gr', brand: 'Cristal', section: 'Cerrado' },
+            { id: 7, name: 'Harina leudante', qty: 1, min: 2, weight: '1 kg', brand: 'Mary', section: 'Cerrado' },
+            { id: 8, name: 'Pasta plumitas', qty: 1, min: 2, weight: '1 kg', brand: 'Primor', section: 'Cerrado' },
+            { id: 9, name: 'Vinagre', qty: 1, min: 1, weight: '1 Litro', brand: 'Genérica', section: 'Cerrado' },
+            { id: 10, name: 'Azúcar', qty: 3, min: 3, weight: '1 kg', brand: 'Kaly', section: 'Cerrado' },
+            { id: 11, name: 'Margarina', qty: 1, min: 2, weight: '500 gr', brand: 'Mavesa', section: 'Cerrado' },
+            { id: 12, name: 'Sardinas', qty: 2, min: 3, weight: 'Lata', brand: 'Varias', section: 'Cerrado' },
+            { id: 13, name: 'Mortadela', qty: 2, min: 2, weight: 'Lata', brand: 'Varias', section: 'Cerrado' },
+            { id: 14, name: 'Mayonesa', qty: 0, min: 1, weight: 'Pote', brand: 'Mavesa', section: 'Cerrado' },
+            { id: 15, name: 'Salsa de tomate (Ketchup)', qty: 0, min: 1, weight: 'Pote', brand: 'Primor', section: 'Cerrado' },
+            { id: 16, name: 'Salsa de Soya', qty: 0, min: 1, weight: '500 ml', brand: 'Oriental', section: 'Cerrado' },
+            { id: 17, name: 'Leche completa', qty: 0, min: 2, weight: '1 Litro', brand: 'Campi', section: 'Cerrado' },
+            { id: 18, name: 'Huevos (Cartón)', qty: 0, min: 1, weight: 'Cartón 30 un', brand: 'Genérica', section: 'Cerrado' },
+            { id: 19, name: 'Aceite vegetal', qty: 0, min: 2, weight: '1 Litro', brand: 'Vatel', section: 'Cerrado' },
+            { id: 20, name: 'Atún enlatado', qty: 0, min: 3, weight: 'Lata', brand: 'Margarita', section: 'Cerrado' },
+            { id: 21, name: 'Café molido', qty: 0, min: 1, weight: '500 gr', brand: 'Fama de América', section: 'Cerrado' },
+
+            { id: 22, name: 'Pasta horizonte (codos)', qty: 1, min: 1, weight: '1 kg', brand: 'Horizonte', section: 'Abierto' },
+            { id: 23, name: 'Pasta caracol', qty: 1, min: 1, weight: '1 kg', brand: 'Genérica', section: 'Abierto' },
+            { id: 24, name: 'Harina leudante', qty: 1, min: 1, weight: '1 kg', brand: 'Genérica', section: 'Abierto' },
+            { id: 25, name: 'Pasta larga Smart', qty: 1, min: 1, weight: '1 kg', brand: 'Smart', section: 'Abierto' },
+
+            { id: 26, name: 'Jabón azul', qty: 0, min: 2, weight: 'Barra', brand: 'Las Llaves', section: 'Casa' },
+            { id: 27, name: 'Panela de detergente', qty: 0, min: 1, weight: 'Barra', brand: 'Las Llaves', section: 'Casa' },
+            { id: 28, name: 'Cloro', qty: 0, min: 1, weight: '1 Litro', brand: 'Clorox', section: 'Casa' },
+            { id: 29, name: 'Desinfectante', qty: 0, min: 1, weight: '1 Litro', brand: 'Mistolin', section: 'Casa' },
+
+            { id: 30, name: 'Jabón de baño bebé', qty: 0, min: 1, weight: 'Barra', brand: 'Johnson\'s', section: 'Bebé' },
+            { id: 31, name: 'Champú bebé', qty: 0, min: 1, weight: '1 Litro', brand: 'Johnson\'s', section: 'Bebé' },
+            { id: 32, name: 'Pañales', qty: 0, min: 2, weight: 'Paquete', brand: 'Huggies', section: 'Bebé' },
+            { id: 33, name: 'Crema dental / Pañalitis', qty: 0, min: 1, weight: 'Pote', brand: 'Hipoglós', section: 'Bebé' }
+        ];
+
+        let inventory = JSON.parse(localStorage.getItem('home_inventory')) || defaultInventory;
+        let shopping = JSON.parse(localStorage.getItem('home_shopping')) || [];
+
+        function saveData() {
+            localStorage.setItem('home_inventory', JSON.stringify(inventory));
+            localStorage.setItem('home_shopping', JSON.stringify(shopping));
+            document.getElementById('shopping-badge').innerText = shopping.length;
+        }
+
+        function switchTab(tab) {
+            const invSec = document.getElementById('section-inventory');
+            const shopSec = document.getElementById('section-shopping');
+            const btnInv = document.getElementById('btn-inventory');
+            const btnShop = document.getElementById('btn-shopping');
+
+            if (tab === 'inventory') {
+                invSec.classList.remove('hidden');
+                shopSec.classList.add('hidden');
+                btnInv.className = "px-4 py-2 bg-indigo-700 rounded-lg font-medium transition flex items-center gap-2 shadow-inner text-sm";
+                btnShop.className = "px-4 py-2 bg-indigo-800/50 hover:bg-indigo-700 rounded-lg font-medium transition flex items-center gap-2 text-sm";
+                renderInventory();
+            } else {
+                invSec.classList.add('hidden');
+                shopSec.classList.remove('hidden');
+                btnShop.className = "px-4 py-2 bg-indigo-700 rounded-lg font-medium transition flex items-center gap-2 shadow-inner text-sm";
+                btnInv.className = "px-4 py-2 bg-indigo-800/50 hover:bg-indigo-700 rounded-lg font-medium transition flex items-center gap-2 text-sm";
+                renderShopping();
+            }
+        }
+
+        function renderInventory() {
+            const search = document.getElementById('search-inventory').value.toLowerCase();
+            const filtered = inventory.filter(item => 
+                item.name.toLowerCase().includes(search) || item.brand.toLowerCase().includes(search)
+            );
+
+            // 1. Alimentos Cerrados
+            const closedItems = filtered.filter(i => i.section === 'Cerrado');
+            const closedLow = closedItems.filter(i => i.qty < i.min);
+            const closedNormal = closedItems.filter(i => i.qty >= i.min);
+            closedLow.sort((a, b) => a.name.localeCompare(b.name));
+            closedNormal.sort((a, b) => a.name.localeCompare(b.name));
+
+            document.getElementById('count-closed').innerText = `${closedItems.length} items`;
+            document.getElementById('subcount-closed-low').innerText = closedLow.length;
+            document.getElementById('subcount-closed-normal').innerText = closedNormal.length;
+            document.getElementById('table-closed-low').innerHTML = closedLow.length === 0 ? `<tr><td colspan="6" class="p-4 text-center text-slate-400 text-xs">¡Todo en orden!</td></tr>` : closedLow.map(i => generateRowHTML(i, true)).join('');
+            document.getElementById('table-closed-normal').innerHTML = closedNormal.length === 0 ? `<tr><td colspan="6" class="p-4 text-center text-slate-400 text-xs">Sin elementos.</td></tr>` : closedNormal.map(i => generateRowHTML(i, true)).join('');
+
+            // 2. Alimentos Abiertos
+            const openItems = filtered.filter(i => i.section === 'Abierto');
+            openItems.sort((a, b) => a.name.localeCompare(b.name));
+            document.getElementById('count-open').innerText = `${openItems.length} items`;
+            document.getElementById('table-open').innerHTML = openItems.length === 0 ? `<tr><td colspan="5" class="p-6 text-center text-slate-400">No hay elementos abiertos.</td></tr>` : openItems.map(i => generateRowHTML(i, false)).join('');
+
+            // 3. Casa
+            const houseItems = filtered.filter(i => i.section === 'Casa');
+            const houseLow = houseItems.filter(i => i.qty < i.min);
+            const houseNormal = houseItems.filter(i => i.qty >= i.min);
+            houseLow.sort((a, b) => a.name.localeCompare(b.name));
+            houseNormal.sort((a, b) => a.name.localeCompare(b.name));
+
+            document.getElementById('count-house').innerText = `${houseItems.length} items`;
+            document.getElementById('subcount-house-low').innerText = houseLow.length;
+            document.getElementById('subcount-house-normal').innerText = houseNormal.length;
+            document.getElementById('table-house-low').innerHTML = houseLow.length === 0 ? `<tr><td colspan="6" class="p-4 text-center text-slate-400 text-xs">¡Todo en orden!</td></tr>` : houseLow.map(i => generateRowHTML(i, true)).join('');
+            document.getElementById('table-house-normal').innerHTML = houseNormal.length === 0 ? `<tr><td colspan="6" class="p-4 text-center text-slate-400 text-xs">Sin elementos.</td></tr>` : houseNormal.map(i => generateRowHTML(i, true)).join('');
+
+            // 4. Bebé
+            const babyItems = filtered.filter(i => i.section === 'Bebé');
+            const babyLow = babyItems.filter(i => i.qty < i.min);
+            const babyNormal = babyItems.filter(i => i.qty >= i.min);
+            babyLow.sort((a, b) => a.name.localeCompare(b.name));
+            babyNormal.sort((a, b) => a.name.localeCompare(b.name));
+
+            document.getElementById('count-baby').innerText = `${babyItems.length} items`;
+            document.getElementById('subcount-baby-low').innerText = babyLow.length;
+            document.getElementById('subcount-baby-normal').innerText = babyNormal.length;
+            document.getElementById('table-baby-low').innerHTML = babyLow.length === 0 ? `<tr><td colspan="6" class="p-4 text-center text-slate-400 text-xs">¡Todo en orden!</td></tr>` : babyLow.map(i => generateRowHTML(i, true)).join('');
+            document.getElementById('table-baby-normal').innerHTML = babyNormal.length === 0 ? `<tr><td colspan="6" class="p-4 text-center text-slate-400 text-xs">Sin elementos.</td></tr>` : babyNormal.map(i => generateRowHTML(i, true)).join('');
+
+            // Alertas globales automáticas
+            const alerts = inventory.filter(i => (i.section === 'Cerrado' || i.section === 'Casa' || i.section === 'Bebé') && i.qty < i.min);
+            document.getElementById('alerts-count-badge').innerText = alerts.length;
+            const alertsAccordion = document.getElementById('alerts-accordion');
+
+            if (alerts.length === 0) {
+                alertsAccordion.classList.add('hidden');
+            } else {
+                alertsAccordion.classList.remove('hidden');
+                document.getElementById('alerts-container').innerHTML = alerts.map(a => `
+                    <div class="bg-white border border-amber-300 px-3 py-2 rounded-lg shadow-sm flex items-center justify-between gap-4 text-xs w-full sm:w-auto flex-grow">
+                        <div>
+                            <span class="font-bold text-amber-900">${a.name} (${a.brand})</span>
+                            <span class="text-rose-600 font-semibold ml-2">Hay: ${a.qty} / Min: ${a.min}</span>
+                        </div>
+                        <button onclick="sendToShoppingFromAlert('${a.id}')" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-2.5 py-1 rounded font-bold transition flex items-center gap-1"><i class="fa-solid fa-cart-plus"></i> Añadir</button>
+                    </div>
+                `).join('');
+            }
+            saveData();
+        }
+
+        function generateRowHTML(item, hasMin) {
+            const isLow = hasMin && item.qty < item.min;
+            return `
+                <tr class="hover:bg-slate-50 transition ${isLow ? 'bg-rose-50/20' : ''}">
+                    <td class="p-2.5 font-bold text-slate-800 flex items-center gap-2">
+                        ${item.name}
+                        ${isLow ? '<span class="bg-rose-100 text-rose-700 text-[10px] px-1.5 py-0.5 rounded font-semibold">Bajo stock</span>' : ''}
+                    </td>
+                    <td class="p-2.5 text-slate-600">${item.brand}</td>
+                    <td class="p-2.5 text-slate-600"><span class="bg-slate-100 px-2 py-0.5 rounded text-xs font-semibold text-slate-700">${item.weight}</span></td>
+                    <td class="p-2.5 text-center">
+                        <div class="inline-flex items-center gap-1.5 bg-slate-100 px-2 py-1 rounded-lg">
+                            <button onclick="updateQty(${item.id}, -1)" class="w-6 h-6 bg-white border rounded text-slate-600 hover:bg-slate-200 font-bold transition">-</button>
+                            <span class="font-bold w-6 text-center">${item.qty}</span>
+                            <button onclick="updateQty(${item.id}, 1)" class="w-6 h-6 bg-white border rounded text-slate-600 hover:bg-slate-200 font-bold transition">+</button>
+                        </div>
+                    </td>
+                    ${hasMin ? `<td class="p-2.5 text-center font-semibold ${isLow ? 'text-rose-600' : 'text-slate-500'}">${item.min}</td>` : ''}
+                    <td class="p-2.5 text-right">
+                        <div class="flex justify-end gap-1">
+                            <button onclick="openModal('edit', ${item.id})" title="Editar" class="p-1.5 text-slate-400 hover:text-indigo-600 transition"><i class="fa-solid fa-pen"></i></button>
+                            <button onclick="sendToShoppingFromInv(${item.id})" title="Enviar al Super" class="p-1.5 text-slate-400 hover:text-emerald-600 transition"><i class="fa-solid fa-cart-plus"></i></button>
+                            <button onclick="deleteInventoryItem(${item.id})" title="Eliminar" class="p-1.5 text-slate-400 hover:text-rose-600 transition"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+
+        function updateQty(id, change) {
+            const item = inventory.find(i => i.id === id);
+            if (item) {
+                item.qty = Math.max(0, item.qty + change);
+                renderInventory();
+            }
+        }
+
+        // SECCIÓN SUPERMERCADO (PESTAÑA 2)
+        function renderShopping() {
+            const container = document.getElementById('shopping-list-container');
+            let total = 0;
+
+            if (shopping.length === 0) {
+                container.innerHTML = `<div class="bg-white p-6 rounded-xl text-center text-slate-400 text-sm shadow-sm border border-slate-200">Tu carrito está vacío. Envía productos desde el inventario o usa el botón de abajo.</div>`;
+                document.getElementById('shopping-total-price').innerText = '$0.00';
+                return;
+            }
+
+            container.innerHTML = shopping.map(s => {
+                let sub = (s.qty * (s.price || 0));
+                total += sub;
+                return `
+                    <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                            <input type="checkbox" ${s.checked ? 'checked' : ''} onclick="toggleShopCheck(${s.id})" class="w-5 h-5 accent-indigo-600 rounded cursor-pointer">
+                            <div class="min-w-0">
+                                <p class="text-xs font-bold truncate ${s.checked ? 'line-through text-slate-400' : 'text-slate-800'}">${s.name} (${s.brand || 'Genérica'})</p>
+                                <p class="text-[10px] text-indigo-600 font-semibold"><i class="fa-solid fa-tag"></i> ${s.weight}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <div class="flex items-center bg-slate-100 rounded px-1">
+                                <button onclick="updateShopQty(${s.id}, -1)" class="w-6 h-6 font-bold text-xs">-</button>
+                                <span class="w-6 text-center text-xs font-bold">${s.qty}</span>
+                                <button onclick="updateShopQty(${s.id}, 1)" class="w-6 h-6 font-bold text-xs">+</button>
+                            </div>
+                            <input type="number" step="0.01" placeholder="Precio" value="${s.price || ''}" onchange="updateShopPrice(${s.id}, this.value)" class="w-20 px-2 py-1 border rounded text-center text-xs font-bold focus:ring-2 focus:ring-indigo-500">
+                            <!-- BOTÓN DE ELIMINAR INDIVIDUAL DE LA LISTA -->
+                            <button onclick="removeShoppingItem(${s.id})" class="text-slate-400 hover:text-rose-600 p-1.5 transition" title="Quitar del carrito"><i class="fa-solid fa-trash-can text-xs"></i></button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('shopping-total-price').innerText = `$${total.toFixed(2)}`;
+            saveData();
+        }
+
+        function toggleShopCheck(id) {
+            const item = shopping.find(s => s.id === id);
+            if (item) { item.checked = !item.checked; renderShopping(); }
+        }
+
+        function updateShopQty(id, change) {
+            const item = shopping.find(s => s.id === id);
+            if (item) {
+                item.qty += change;
+                if (item.qty <= 0) {
+                    // Si llega a cero o menos, lo eliminamos automáticamente del carrito
+                    shopping = shopping.filter(s => s.id !== id);
+                }
+                renderShopping();
+            }
+        }
+
+        function updateShopPrice(id, price) {
+            const item = shopping.find(s => s.id === id);
+            if (item) { item.price = parseFloat(price) || 0; renderShopping(); }
+        }
+
+        function removeShoppingItem(id) {
+            shopping = shopping.filter(s => s.id !== id);
+            renderShopping();
+            saveData();
+        }
+
+        function clearCompletedShopping() {
+            shopping = shopping.filter(s => !s.checked);
+            renderShopping();
+        }
+
+        function updateInventoryFromShopping() {
+            if (shopping.length === 0) { alert("El carrito está vacío."); return; }
+
+            shopping.forEach(s => {
+                if (s.inventoryId) {
+                    let inv = inventory.find(i => i.id === s.inventoryId);
+                    if (inv) inv.qty += s.qty;
+                } else {
+                    inventory.push({ id: Date.now() + Math.random(), name: s.name, qty: s.qty, min: 2, weight: s.weight || 'Unidad', brand: s.brand || 'Genérica', section: 'Cerrado' });
+                }
+            });
+
+            shopping = [];
+            saveData();
+            alert("¡Compra procesada con éxito y stock actualizado en el inventario!");
+            switchTab('inventory');
+        }
+
+        function sendToShoppingFromInv(id) {
+            const item = inventory.find(i => i.id === id);
+            if (item) {
+                let needed = item.min > item.qty ? (item.min - item.qty) : 1;
+                let existing = shopping.find(s => s.inventoryId === id);
+                if (existing) {
+                    existing.qty += needed;
+                } else {
+                    shopping.push({ id: Date.now(), inventoryId: id, name: item.name, brand: item.brand, weight: item.weight, qty: needed, price: 0, checked: false });
+                }
+                saveData();
+                alert(`¡"${item.name} (${item.brand})" añadido al súper!`);
+            }
+        }
+
+        function sendToShoppingFromAlert(id) {
+            sendToShoppingFromInv(parseInt(id));
+        }
+
+        function sendAllAlertsToShopping() {
+            const alerts = inventory.filter(i => (i.section === 'Cerrado' || i.section === 'Casa' || i.section === 'Bebé') && i.qty < i.min);
+            if (alerts.length === 0) return;
+
+            alerts.forEach(item => {
+                let needed = item.min - item.qty;
+                let existing = shopping.find(s => s.inventoryId === item.id);
+                if (existing) {
+                    existing.qty += needed;
+                } else {
+                    shopping.push({ id: Date.now() + Math.random(), inventoryId: item.id, name: item.name, brand: item.brand, weight: item.weight, qty: needed, price: 0, checked: false });
+                }
+            });
+            saveData();
+            alert(`¡Se agregaron todas las alertas al carrito de compras!`);
+        }
+
+        // Modales de control
+        function openModal(mode, id = null) {
+            const modal = document.getElementById('modal');
+            const title = document.getElementById('modal-title');
+            document.getElementById('modal-form').reset();
+
+            if (mode === 'create') {
+                title.innerText = 'Nuevo Elemento al Inventario';
+                document.getElementById('form-id').value = '';
+                document.getElementById('form-min').value = '2';
+            } else if (mode === 'edit') {
+                title.innerText = 'Editar Elemento y Stock';
+                const item = inventory.find(i => i.id === id);
+                if (item) {
+                    document.getElementById('form-id').value = item.id;
+                    document.getElementById('form-name').value = item.name;
+                    document.getElementById('form-category').value = item.section;
+                    document.getElementById('form-qty').value = item.qty;
+                    document.getElementById('form-weight').value = item.weight;
+                    document.getElementById('form-brand').value = item.brand;
+                    document.getElementById('form-min').value = item.min;
+                }
+            }
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeModal() { document.getElementById('modal').classList.add('hidden'); document.getElementById('modal').classList.remove('flex'); }
+        function openCustomShoppingModal() { document.getElementById('modal-shopping').classList.remove('hidden'); document.getElementById('modal-shopping').classList.add('flex'); }
+        function closeCustomShoppingModal() { document.getElementById('modal-shopping').classList.add('hidden'); document.getElementById('modal-shopping').classList.remove('flex'); }
+
+        function handleFormSubmit(e) {
+            e.preventDefault();
+            const id = document.getElementById('form-id').value;
+            const name = document.getElementById('form-name').value;
+            const section = document.getElementById('form-category').value;
+            const qty = parseInt(document.getElementById('form-qty').value) || 0;
+            const weight = document.getElementById('form-weight').value || 'Unidad';
+            const brand = document.getElementById('form-brand').value || 'Genérica';
+            const min = parseInt(document.getElementById('form-min').value) || 2;
+
+            if (id) {
+                const item = inventory.find(i => i.id == id);
+                if (item) { item.name = name; item.section = section; item.qty = qty; item.weight = weight; item.brand = brand; item.min = min; }
+            } else {
+                inventory.push({ id: Date.now(), name, qty, min, weight, brand, section });
+            }
+            closeModal();
+            renderInventory();
+        }
+
+        function handleCustomShoppingSubmit(e) {
+            e.preventDefault();
+            shopping.push({
+                id: Date.now(),
+                name: document.getElementById('shop-custom-name').value,
+                qty: parseInt(document.getElementById('shop-custom-qty').value) || 1,
+                price: parseFloat(document.getElementById('shop-custom-price').value) || 0,
+                weight: document.getElementById('shop-custom-weight').value || 'Unidad',
+                brand: 'Calle',
+                checked: false
+            });
+            closeCustomShoppingModal();
+            renderShopping();
+            saveData();
+        }
+
+        function deleteInventoryItem(id) {
+            inventory = inventory.filter(i => i.id !== id);
+            renderInventory();
+        }
+
+        // Inicializar interfaz
+        renderInventory();
+        saveData();
+    </script>
+</body>
+</html>
